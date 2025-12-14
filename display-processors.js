@@ -135,27 +135,79 @@
 
     // Convert date format from PHP to Luxon
     function convertDateFormat(phpFormat) {
-        const formatMap = {
-            'n/j/Y': 'M/d/yyyy',
-            'm/d/Y': 'MM/dd/yyyy',
-            'Y-m-d': 'yyyy-MM-dd',
-            'd/m/Y': 'dd/MM/yyyy',
-            'm-d-Y': 'MM-dd-yyyy'
-        };
+        // Use numbered placeholders to avoid any conflicts
+        let luxonFormat = phpFormat;
 
-        return formatMap[phpFormat] || 'M/d/yyyy';
+        // Year
+        luxonFormat = luxonFormat.replace(/Y/g, '§1§');   // 4-digit year → yyyy
+        luxonFormat = luxonFormat.replace(/y/g, '§2§');   // 2-digit year → yy
+
+        // Month
+        luxonFormat = luxonFormat.replace(/F/g, '§3§');   // Full month name → MMMM
+        luxonFormat = luxonFormat.replace(/M/g, '§4§');   // Short month name → MMM
+        luxonFormat = luxonFormat.replace(/m/g, '§5§');   // Month with leading zero → MM
+        luxonFormat = luxonFormat.replace(/n/g, '§6§');   // Month without leading zero → M
+
+        // Day
+        luxonFormat = luxonFormat.replace(/l/g, '§7§');   // Full day name → EEEE (do before 'd')
+        luxonFormat = luxonFormat.replace(/D/g, '§8§');   // Short day name → EEE (do before 'd')
+        luxonFormat = luxonFormat.replace(/d/g, '§9§');   // Day with leading zero → dd
+        luxonFormat = luxonFormat.replace(/j/g, '§10§');  // Day without leading zero → d
+
+        // Time
+        luxonFormat = luxonFormat.replace(/H/g, '§11§');  // 24-hour with leading zero → HH
+        luxonFormat = luxonFormat.replace(/G/g, '§12§');  // 24-hour without leading zero → H
+        luxonFormat = luxonFormat.replace(/h/g, '§13§');  // 12-hour with leading zero → hh
+        luxonFormat = luxonFormat.replace(/g/g, '§14§');  // 12-hour without leading zero → h
+        luxonFormat = luxonFormat.replace(/i/g, '§15§');  // Minutes → mm
+        luxonFormat = luxonFormat.replace(/s/g, '§16§');  // Seconds → ss
+        luxonFormat = luxonFormat.replace(/A/g, '§17§');  // AM/PM uppercase → a
+        luxonFormat = luxonFormat.replace(/a/g, '§18§');  // AM/PM lowercase → a
+
+        // Replace all numbered placeholders with actual Luxon format
+        luxonFormat = luxonFormat.replace(/§1§/g, 'yyyy');
+        luxonFormat = luxonFormat.replace(/§2§/g, 'yy');
+        luxonFormat = luxonFormat.replace(/§3§/g, 'MMMM');
+        luxonFormat = luxonFormat.replace(/§4§/g, 'MMM');
+        luxonFormat = luxonFormat.replace(/§5§/g, 'MM');
+        luxonFormat = luxonFormat.replace(/§6§/g, 'M');
+        luxonFormat = luxonFormat.replace(/§7§/g, 'EEEE');
+        luxonFormat = luxonFormat.replace(/§8§/g, 'EEE');
+        luxonFormat = luxonFormat.replace(/§9§/g, 'dd');
+        luxonFormat = luxonFormat.replace(/§10§/g, 'd');
+        luxonFormat = luxonFormat.replace(/§11§/g, 'HH');
+        luxonFormat = luxonFormat.replace(/§12§/g, 'H');
+        luxonFormat = luxonFormat.replace(/§13§/g, 'hh');
+        luxonFormat = luxonFormat.replace(/§14§/g, 'h');
+        luxonFormat = luxonFormat.replace(/§15§/g, 'mm');
+        luxonFormat = luxonFormat.replace(/§16§/g, 'ss');
+        luxonFormat = luxonFormat.replace(/§17§/g, 'a');
+        luxonFormat = luxonFormat.replace(/§18§/g, 'a');
+
+        return luxonFormat;
     }
 
     // Convert processor value to n8n expression
     function convertValueToN8n(value) {
         if (!value) return 'Empty';
 
-        // Handle [date col_name="X"] format
-        const dateMatch = value.match(/\[date col_name="([^"]+)"\](.+)?/);
-        if (dateMatch) {
-            const colName = dateMatch[1];
-            const suffix = dateMatch[2] || '';
-            return `={{ DateTime.fromFormat($json['${colName}'], 'M/d/yyyy').toFormat('yyyy-MM-dd') }}${suffix}`;
+        // Handle [date col_name="X" from_format='...' format="..."] format
+        // The regex handles both single and double quotes for from_format
+        const dateMatchWithFormat = value.match(/\[date col_name="([^"]+)"(?:\s+from_format=['"]([^'"]+)['"])?(?:\s+format=['"]([^'"]+)['"])?\](.+)?/);
+        if (dateMatchWithFormat) {
+            const colName = dateMatchWithFormat[1];
+            const fromFormat = dateMatchWithFormat[2]; // PHP format from the source
+            const outputFormat = dateMatchWithFormat[3]; // PHP format for output (we ignore this)
+            const suffix = dateMatchWithFormat[4] || '';
+
+            // Convert PHP format to Luxon format
+            let luxonFromFormat = 'M/d/yyyy'; // default
+            if (fromFormat) {
+                luxonFromFormat = convertDateFormat(fromFormat);
+            }
+
+            // Always output as yyyy-MM-dd regardless of the format parameter
+            return `={{ DateTime.fromFormat($json['${colName}'], '${luxonFromFormat}').toFormat('yyyy-MM-dd') }}${suffix}`;
         }
 
         // Handle [strreplace col_name="X" search="Y" replace="Z"] - treat as [translated col_name="X"]
