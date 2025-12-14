@@ -197,14 +197,15 @@
         if (dateMatchWithFormat) {
             const colName = dateMatchWithFormat[1];
             const fromFormat = dateMatchWithFormat[2]; // PHP format from the source
-            const outputFormat = dateMatchWithFormat[3]; // PHP format for output (we ignore this)
             const suffix = dateMatchWithFormat[4] || '';
 
-            // Convert PHP format to Luxon format
-            let luxonFromFormat = 'M/d/yyyy'; // default
-            if (fromFormat) {
-                luxonFromFormat = convertDateFormat(fromFormat);
+            // If there's no from_format, just use the raw value (no conversion needed)
+            if (!fromFormat) {
+                return `={{ $json["${colName}"] }}${suffix}`;
             }
+
+            // Convert PHP format to Luxon format
+            const luxonFromFormat = convertDateFormat(fromFormat);
 
             // Always output as yyyy-MM-dd regardless of the format parameter
             return `={{ DateTime.fromFormat($json['${colName}'], '${luxonFromFormat}').toFormat('yyyy-MM-dd') }}${suffix}`;
