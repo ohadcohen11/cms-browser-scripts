@@ -273,13 +273,17 @@
         // Build conditions for IF node
         const n8nConditions = conditions.map((cond, index) => {
             if (cond.type === 'simple') {
+                // Detect if this is a numeric comparison
+                const isNumericComparison = ['>', '>=', '<', '<='].includes(cond.condition);
+                const operatorType = isNumericComparison ? 'number' : 'string';
+
                 return {
                     id: `cond${index + 1}`,
                     leftValue: `={{ $json['${cond.column}'] }}`,
                     rightValue: cond.value,
                     operator: {
-                        type: 'string',
-                        operation: convertOperator(cond.condition, 'string')
+                        type: operatorType,
+                        operation: convertOperator(cond.condition, operatorType)
                     }
                 };
             } else if (cond.type === 'date') {
@@ -494,13 +498,17 @@
             // Build conditions for IF node
             const n8nConditions = conditions.map((cond, condIndex) => {
                 if (cond.type === 'simple') {
+                    // Detect if this is a numeric comparison
+                    const isNumericComparison = ['>', '>=', '<', '<='].includes(cond.condition);
+                    const operatorType = isNumericComparison ? 'number' : 'string';
+
                     return {
                         id: `cond${condIndex + 1}`,
                         leftValue: `={{ $json['${cond.column}'] }}`,
                         rightValue: cond.value,
                         operator: {
-                            type: 'string',
-                            operation: convertOperator(cond.condition, 'string')
+                            type: operatorType,
+                            operation: convertOperator(cond.condition, operatorType)
                         }
                     };
                 } else if (cond.type === 'date') {
