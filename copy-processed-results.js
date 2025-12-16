@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         TrafficPoint Logs - Copy Processed Results
 // @namespace    http://tampermonkey.net/
-// @version      1.1
-// @description  Extract and copy processed results from TrafficPoint logs as JSON or CSV (only when count > 0)
+// @version      1.2
+// @description  Extract and copy processed results from TrafficPoint logs as JSON, CSV, or XLSX (only when count > 0)
 // @author       Ohad
 // @match        https://cms.trafficpointltd.com/reports/logs/*
+// @require      https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js
 // @grant        none
 // ==/UserScript==
 
@@ -54,6 +55,13 @@
         }
         .tp-export-per-processor:hover {
             background: #7B1FA2;
+        }
+        .tp-export-xlsx {
+            background: #FF9800;
+            color: white;
+        }
+        .tp-export-xlsx:hover {
+            background: #F57C00;
         }
         .tp-export-notification {
             position: fixed;
@@ -169,6 +177,7 @@
         <button class="tp-export-btn tp-export-json" id="exportJSON">📋 Copy All as JSON</button>
         <button class="tp-export-btn tp-export-csv" id="exportCSV">📊 Copy All as CSV</button>
         <button class="tp-export-btn tp-export-per-processor" id="exportPerProcessor">🔍 Per Processor</button>
+        <button class="tp-export-btn tp-export-xlsx" id="exportXLSX">📥 Download Excel</button>
     `;
     document.body.appendChild(container);
 
@@ -397,6 +406,49 @@
         }, 3000);
     }
 
+    // Function to download all processors as XLSX
+    function downloadProcessorsAsXLSX() {
+        const processorResults = extractProcessedResultsByProcessor();
+        const processorList = Object.values(processorResults);
+
+        if (processorList.length === 0) {
+            showNotification('❌ No processors with results found (Count > 0)');
+            return;
+        }
+
+        try {
+            // Create a new workbook
+            const workbook = XLSX.utils.book_new();
+
+            // Add each processor as a separate sheet
+            processorList.forEach(processor => {
+                if (processor.results.length === 0) return;
+
+                // Convert results to worksheet
+                const worksheet = XLSX.utils.json_to_sheet(processor.results);
+
+                // Sanitize sheet name (Excel has restrictions: max 31 chars, no special chars)
+                let sheetName = processor.name.replace(/[:\\\/\?\*\[\]]/g, '_');
+                sheetName = sheetName.substring(0, 31);
+
+                // Add worksheet to workbook
+                XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+            });
+
+            // Generate filename with timestamp
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            const filename = `TrafficPoint_Processors_${timestamp}.xlsx`;
+
+            // Write and download the file
+            XLSX.writeFile(workbook, filename);
+
+            showNotification(`✅ Downloaded ${processorList.length} processor${processorList.length !== 1 ? 's' : ''} as Excel`);
+        } catch (error) {
+            console.error('Error creating XLSX:', error);
+            showNotification('❌ Error creating Excel file: ' + error.message);
+        }
+    }
+
     // Function to show processor selection modal
     function showProcessorModal() {
         const processorResults = extractProcessedResultsByProcessor();
@@ -504,6 +556,10 @@
 
     document.getElementById('exportPerProcessor').addEventListener('click', () => {
         showProcessorModal();
+    });
+
+    document.getElementById('exportXLSX').addEventListener('click', () => {
+        downloadProcessorsAsXLSX();
     });
 
     console.log('TrafficPoint Logs Exporter loaded successfully');
